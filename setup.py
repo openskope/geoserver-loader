@@ -20,6 +20,8 @@ setup(
     install_requires=[
         'gsconfig',
         'rasterio>=1.0a12',
+        'rasterstats',
+        'fiona',
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
@@ -30,6 +32,7 @@ setup(
     ],
 
     scripts=[
+        'scripts/zonalinfo.py',
         'scripts/load_paleocar.py',
         'scripts/convert.sh'
     ]
