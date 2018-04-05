@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 """
 Modeled after gdallocationinfo, this tool is designed to efficiently
 generate zonal statistics for a single region. Inputs include a raster 
