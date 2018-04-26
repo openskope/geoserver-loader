@@ -115,7 +115,7 @@ def main():
         zonal = { args.method: [] }
 
     with rasterio.open(args.raster) as src:
-        masked, transform, window = raster_geometry_mask(src, geoms, crop=True)
+        masked, transform, window = raster_geometry_mask(src, geoms, crop=True, all_touched=True)
         zonal['window'] = window
         zonal['count'] = src.count
         zonal['band'] = range(src.count)
