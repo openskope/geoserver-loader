@@ -34,9 +34,8 @@ setup(
     scripts=[
         'scripts/zonalinfo.py',
         'scripts/load_paleocar.py',
+        'scripts/fmerge.py',
         'scripts/convert.sh'
     ]
 
 )
-
-        
