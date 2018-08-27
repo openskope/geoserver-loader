@@ -33,7 +33,7 @@ setup(
 
     scripts=[
         'scripts/zonalinfo.py',
-        'scripts/load_paleocar.py',
+        'scripts/load_geoserver.py',
         'scripts/convert.sh'
     ]
 

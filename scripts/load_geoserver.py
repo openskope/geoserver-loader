@@ -12,6 +12,7 @@ from geoserver.catalog import Catalog
 
 
 def add_geoserver_args(parser):
+
     parser.add_argument('-u', '--url',
         default=os.environ.get('GEOSERVER_URL', ''),
         help='url (default=$GEOSERVER_URL)')
@@ -30,15 +31,16 @@ def add_geoserver_args(parser):
 
 
 def add_local_args(parser):
-    parser.add_argument('-f', '--format', default='',
-        help='dynamically create layer name from path (default=basename)')
+
+    parser.add_argument('--layername', default='{}',
+        help='layer name (defaults to filename without path or ext)')
     parser.add_argument('-e', '--extpath', default='',
-        help='external path prepended to all relative file paths.')
-    parser.add_argument('-m', '--matchpath', default='',
-        help='matches local path to replaces it with external path')
+        help='external path prepended to all filename arguments')
+    parser.add_argument('--prefix', default='',
+        help='prefix to be removed from all filename arguments')
     parser.add_argument('fnames', nargs='+',
-        help='local geotiff to be added to remote geoserver')
-    parser.add_argument('-d', '--debug', default=logging.WARN,
+        help='external geotiff filename to be added to remote geoserver')
+    parser.add_argument('-d', '--debug', default=logging.WARNING,
         const=logging.DEBUG, action='store_const',
         help='provide verbose processing')
 
@@ -54,50 +56,64 @@ def get_catalog(args):
     return Catalog(args.url, args.login, args.password)
 
 
-def get_layer_name(fname, _format='{three}'):
-    """create layer name based on filename and path"""
+def get_layer_name(fname, template='{}'):
+    """create layer name based on filename
 
-    fbase, ext = os.path.splitext(fname)
+    Get the base filename from the fname argument by removing any path
+    or extensions. Create layer name by formating the template string
+    with one argument, the base filename.
 
-    path = fbase.split('/')
-    while path[0] == '':
-        path.pop(0)
+    Args:
+      fname (str): absolule or relative filename
+      template (str): layer name template
 
-    name = _format.format(*path, one=path[-3], two=path[-2], three=path[-1])
-    logging.debug('layer_name = %s', name)
-    return name
+    Returns:
+      (str): layer name
+    """
+
+    head, tail = os.path.split(fname)
+    if tail == '':
+        raise RuntimeError, 'bad filename argument, must not end with a /'
+    base, ext = os.path.splitext(tail)
+
+    layername = template.format(base)
+    logging.debug('layer name = %s', layername)
+    return layername
 
 
-def get_external_path(fname, base, prefix):
-    """remove fname prefix and prepend base"""
+def get_external_path(extpath, fname, prefix = ''):
+    """remove fname prefix and prepend external path"""
 
     if prefix and fname.startswith(prefix):
         fname = fname[len(prefix):]
         if fname[0] == '/':
             fname = fname[1:]
 
-    logging.debug('%s, %s', base, fname)
-    uri = 'file://' + os.path.join(base, fname)
+    uri = 'file://' + os.path.join(extpath, fname)
     logging.debug('external path = %s', uri)
     return uri
 
 
-def validate_file(fname):
-    """basic sanity check on the local file"""
-    if not os.path.exists(fname):
-        logging.warn('file missing or unreadable: %s', fname)
-        return False
-
-    return True    
-
-
-def set_default_style(cat, name, style):
+def set_default_style(cat, layername, stylename):
     """find layer and apply a style if one is given"""
     
-    if style:
-        layer = cat.get_layer(name)
-        layer.default_style = style
-        cat.save(layer)
+    if stylename:
+        style = cat.get_style(stylename)
+    else:
+        logging.warn('no style provided, layer will use geoserver defaults')
+
+    if not style:
+        logging.error('style not found, layer will use geoserver defaults')
+        return
+
+    logging.debug('applying style %s to layer %s', stylename, layername)
+    layer = cat.get_layer(layername)
+    if not layer:
+        logging.error('layer %s not found, no style applied', layername)
+        return
+
+    layer.default_style = style
+    cat.save(layer)
 
 
 def main():
@@ -113,22 +129,17 @@ def main():
         cat = get_catalog(args)
         cat.workspace = args.workspace
         logging.debug('default workspace set to %s', args.workspace)
+
     except RuntimeError, e:
         logging.error('Unable to connect to Geoserver: %s', e)
         sys.exit(-1)
     
-    style = None
-    if args.style:
-        style = cat.get_style(args.style)
-
     for fname in args.fnames:
-        logging.debug('local path = %s', fname)
-        if validate_file(fname):
-            name = get_layer_name(fname, args.format)
-            path = get_external_path(fname, args.extpath, 
-                                     prefix=args.matchpath)
-            cat.create_coveragestore_external_geotiff(name, path)
-            set_default_style(cat, name, style)
+        logging.debug('fname argument = %s', fname)
+        layername = get_layer_name(fname, template=args.layername)
+        extpath = get_external_path(args.extpath, fname, prefix=args.prefix)
+        cat.create_coveragestore_external_geotiff(layername, extpath)
+        set_default_style(cat, layername, args.style)
 
 
 if __name__ == '__main__':
